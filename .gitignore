@@ -1,0 +1,8 @@
+models/
+work/
+*.pt
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.DS_Store

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "live-swap-bg"
+version = "0.1.0"
+description = "Swap the background of a real hand-held product clip (Live Photo) on a local GPU, without a video generation model."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "opencv-python",
+    "pillow",
+    "torch>=2.3",
+    "transformers>=4.40",
+    "huggingface_hub",
+    "SAM-2 @ git+https://github.com/facebookresearch/sam2.git",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+live-swap-bg = "live_swap_bg.cli:main"
+
+[tool.setuptools]
+packages = ["live_swap_bg"]
+
+[tool.setuptools.package-data]
+live_swap_bg = ["swift/*.swift"]
+
+[tool.ruff]
+line-length = 130
