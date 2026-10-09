@@ -10,8 +10,8 @@
 - **不用视频生成模型。** 视频里的手和商品都是真实拍摄的，这个工具只做分割和抠图（SAM 2 + ViTMatte），
   所以商品不会变形，包装上的字也不会写错。AI 视频模型凭一张图去理解商品，常把包装画错，带货视频里的商品就和实物对不上了。
   只有背景图需要生图模型，用你顺手的任何工具都行。
-- **本地 GPU，边际成本接近零。** 在 Apple M4 的 Mac 上，一条 2.8 秒的 Live Photo（83 帧）从头到尾大约 4.6 分钟，
-  除了电费不花钱。对比一下，按条计费的视频生成服务，我们之前用过的一家 4 秒 720p 一条约 2 元。
+- **本地 GPU，边际成本接近零。** 在 Apple M4 的 Mac 上，一条 2.8 秒的 Live Photo（83 帧）从头到尾 5 到 7 分钟
+  （两次实测 4.6 和 6.8 分钟，随机器负载变化），除了电费不花钱。对比一下，按条计费的视频生成服务，我们之前用过的一家 4 秒 720p 一条约 2 元。
 - **看起来像真的在那儿拍的。** 新背景按原片背景算出的镜头运动一起平移（商品在动、背景纹丝不动，一眼就假）；
   商品按新背景的光源重新打光，投下阴影；抠图边缘带着的原墙色会被洗掉。
 
@@ -47,8 +47,8 @@ live-swap-bg download-models        # SAM 2.1 Large + ViTMatte，约 1.3 GB，�
 live-swap-bg init demo/eucerin/IMG_1848.MOV work/eucerin
 cp demo/eucerin/prompts.json work/eucerin/      # 首帧上的打点，正式用时要自己写
 live-swap-bg seed  work/eucerin                 # 看 work/eucerin/seed-review.jpg，轮廓要贴住真实边缘
-live-swap-bg track work/eucerin                 # SAM 2 全片跟踪（M4 约 2.7 分钟）
-live-swap-bg matte work/eucerin                 # ViTMatte 抠细边缘（M4 约 1.4 分钟）
+live-swap-bg track work/eucerin                 # SAM 2 全片跟踪（M4 上 3 到 4 分钟）
+live-swap-bg matte work/eucerin                 # ViTMatte 抠细边缘（M4 上 1.5 到 2 分钟）
 live-swap-bg motion work/eucerin                # 从原背景估算镜头运动
 live-swap-bg plate work/eucerin demo/eucerin/background.png
 live-swap-bg render work/eucerin                # -> work/eucerin/out/eucerin.mp4
@@ -109,7 +109,7 @@ the hand and the product stay exactly as shot, and the new scene moves with the 
 - **No video generation model.** The hand and product are real footage; the tool only segments and mattes
   (SAM 2 + ViTMatte), so the product never warps and its label text never gets rewritten. Only the background image
   is generated, with whatever image tool you like.
-- **Runs on your own GPU.** A 2.8 s Live Photo (83 frames) takes about 4.6 minutes end to end on an Apple M4 Mac.
+- **Runs on your own GPU.** A 2.8 s Live Photo (83 frames) takes 5-7 minutes end to end on an Apple M4 Mac.
 - **Looks shot on location.** The new background follows the camera motion measured from the original background,
   the product is relit to the plate's light and casts a shadow, and the old wall colour is cleaned off the matte edge.
 
