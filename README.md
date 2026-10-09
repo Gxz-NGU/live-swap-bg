@@ -11,7 +11,7 @@
 
 - **不用视频生成模型。** 视频里的手和商品都是真实拍摄的，这个工具只做分割和抠图（SAM 2 + ViTMatte），
   所以商品不会变形，包装上的字也不会写错。AI 视频模型凭一张图去理解商品，常把包装画错，带货视频里的商品就和实物对不上了。
-  只有背景图需要生图模型，用你顺手的任何工具都行。
+  只有背景要用生图模型，而且只生成一张静态图，见下面的[背景图怎么生成](#背景图怎么生成)。
 - **本地 GPU，边际成本接近零。** 在 Apple M4 的 Mac 上，一条 2.8 秒的 Live Photo（83 帧）从头到尾 5 到 7 分钟
   （两次实测 4.6 和 6.8 分钟，随机器负载变化），除了电费不花钱。对比一下，按条计费的视频生成服务，我们之前用过的一家 4 秒 720p 一条约 2 元。
 - **看起来像真的在那儿拍的。** 新背景按原片背景算出的镜头运动一起平移（商品在动、背景纹丝不动，一眼就假）；
@@ -25,7 +25,9 @@
 - 只还原镜头的**平移**，不还原旋转、缩放、透视和视差。手机手持的轻微晃动没问题，大幅转动镜头的片子不适合。
 - **片子要挑**：原背景要有纹理（纯色墙算不出镜头运动），手要从画面边缘伸进来，手和商品不能碰到画面上沿。
   `live-swap-bg check` 可以先给片子打分。
-- 种子掩膜要**人工在首帧上点几个点**（商品一组、手一组）。这是质量的关键，skill 里有详细的打点方法。
+- 抠图从首帧上的几个**提示点**开始（商品一组、手一组），这一步决定质量。我们自己是交给 AI agent 做的：
+  它看带坐标网格的首帧写出提示点，再看轮廓图自己补点修正，直到轮廓贴住真实边缘，人不用动手。
+  方法写在 skill 里，见[用 AI agent 来做](#用-ai-agent-来做)；没有 agent 也可以照着格式手写。
 - **成片一定要人看。** 指标只能告诉你看哪几帧。我们自己做的时候，20 条里放大检查能挑出 8 条有问题，再回头修。
 - 在 Apple 芯片 Mac（MPS）上实测过。NVIDIA 显卡（CUDA）代码里支持，但没有测过。
 - Live Photo 导出只支持 macOS（用的是 AVFoundation），并且输入必须是 iPhone Live Photo 的原始 `.MOV`。
@@ -43,11 +45,32 @@ pip install -e .
 live-swap-bg download-models        # SAM 2.1 Large + ViTMatte，约 1.3 GB，下载到 ./models
 ```
 
+## 背景图怎么生成
+
+新背景是一张静态图，要用生图模型单独生成。我们用的是 [Codex CLI](https://github.com/openai/codex) 自带的生图功能
+（用 ChatGPT 账号登录），模型参数 `gpt-5.6-terra`，一张大约 1 分钟，出图 1086×1448。本仓库演示里的四张背景都是这样生成的：
+
+```bash
+codex exec -m gpt-5.6-terra --sandbox read-only --skip-git-repo-check \
+  "Generate one image. Do not write code, do not explain. $(cat demo/eucerin/background-prompt.txt)"
+# 生成的图片在 ~/.codex/generated_images/ 下
+```
+
+其他生图模型我们没有试过，按下面几条写提示词应该都能用：
+
+- **只要背景**：不要人、手、商品、文字、logo。不明说的话，模型经常把商品也画进去。
+- **竖版 3:4**，画面中间留空，道具只放在边角，别挡住手和商品活动的位置。
+- **明暗接近原片的墙**：差太多时 `plate` 会拒绝调色（见[流程](#流程)）。商品和背景要拉开，白瓶子别配纯白墙。
+- **按商品配场景**：洁面配浴室台面，香氛配卧室窗边，同一批别重样。
+
+提示词例子：[`demo/eucerin/background-prompt.txt`](demo/eucerin/background-prompt.txt)，以及顶部三条对比用的
+[`demo/gallery/scene-prompts/`](demo/gallery/scene-prompts/)。
+
 ## 快速开始（用自带的演示素材）
 
 ```bash
 live-swap-bg init demo/eucerin/IMG_1848.MOV work/eucerin
-cp demo/eucerin/prompts.json work/eucerin/      # 首帧上的打点，正式用时要自己写
+cp demo/eucerin/prompts.json work/eucerin/      # 首帧上的提示点；换成你的片子时让 agent 写，或者手写
 live-swap-bg seed  work/eucerin                 # 看 work/eucerin/seed-review.jpg，轮廓要贴住真实边缘
 live-swap-bg track work/eucerin                 # SAM 2 全片跟踪（M4 上 3 到 4 分钟）
 live-swap-bg matte work/eucerin                 # ViTMatte 抠细边缘（M4 上 1.5 到 2 分钟）
@@ -60,16 +83,18 @@ live-swap-bg livephoto work/eucerin             # -> work/eucerin/out/livephoto/
 
 每一步都会打印一段 JSON，并把结果写进工作目录。目录结构见 [`live_swap_bg/clip.py`](live_swap_bg/clip.py) 顶部。
 
-## 用 Claude Code 来做
+## 用 AI agent 来做
 
-把 skill 拷到 Claude Code 能找到的地方：
+我们平时就是这么用的：人只负责给素材和最后看成片，中间每一步都由 agent 完成。以 Claude Code 为例，把 skill 拷到它能找到的地方：
 
 ```bash
 cp -r skills/live-swap-bg ~/.claude/skills/
 ```
 
-然后直接说"帮我把这条视频换个背景"，把视频和场景图给它。skill 会带着它走完整个流程：每一步要看什么、
-哪些问题指标看不出来必须人眼查、常见问题怎么修。这些都是我们实际踩坑后总结的，见 [`skills/live-swap-bg/SKILL.md`](skills/live-swap-bg/SKILL.md)。
+然后直接说"帮我把这条视频换个背景"，把视频给它（场景图可以自己给，也可以让它写提示词、调用 Codex 生成）。
+skill 会带着它走完整个流程：看网格图打提示点、看轮廓图修正、每一步要检查什么、常见问题怎么修，
+以及哪些问题指标看不出来、必须交给人看。这些都是我们实际踩坑后总结的，见 [`skills/live-swap-bg/SKILL.md`](skills/live-swap-bg/SKILL.md)。
+skill 就是一份 Markdown 说明，不绑定 Claude Code：我们的生产批次也交给 Codex 按同样的说明做过。
 
 ## 流程
 
@@ -109,14 +134,16 @@ pytest -q
 the hand and the product stay exactly as shot, and the new scene moves with the original camera.
 
 - **No video generation model.** The hand and product are real footage; the tool only segments and mattes
-  (SAM 2 + ViTMatte), so the product never warps and its label text never gets rewritten. Only the background image
-  is generated, with whatever image tool you like.
+  (SAM 2 + ViTMatte), so the product never warps and its label text never gets rewritten. Only the background is
+  generated, as one still image: ours come from the Codex CLI image tool (`codex exec -m gpt-5.6-terra`, about a minute
+  each); any image model should do if the prompt rules out people, hands, products and text and asks for portrait 3:4.
 - **Runs on your own GPU.** A 2.8 s Live Photo (83 frames) takes 5-7 minutes end to end on an Apple M4 Mac.
 - **Looks shot on location.** The new background follows the camera motion measured from the original background,
   the product is relit to the plate's light and casts a shadow, and the old wall colour is cleaned off the matte edge.
 
 Output is 720×960 portrait at 30 fps; only camera translation is reconstructed. Tested on Apple Silicon (MPS);
 CUDA is supported in code but untested. Live Photo export is macOS only and needs the original Live Photo `.MOV`.
-A person still has to review every result. Install with `pip install -e .` then `live-swap-bg download-models`;
+The prompt points that seed the matte are written by an AI agent looking at a gridded first frame (or by hand);
+a person still has to review every result. Install with `pip install -e .` then `live-swap-bg download-models`;
 the walkthrough above uses the bundled demo clip (the three clips in the comparison at the top are not shipped). A Claude Code skill in `skills/live-swap-bg/` guides an agent
 through every step and its known failure modes.

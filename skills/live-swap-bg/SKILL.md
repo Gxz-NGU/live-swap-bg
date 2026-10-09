@@ -15,8 +15,10 @@ description: 给手持商品的 Live Photo / 短视频换背景（动图换背�
 
 - 第一次用：`live-swap-bg download-models`（约 1.3 GB，放到 `./models` 或 `$LIVE_SWAP_BG_MODELS`）。
 - 用户要提供：一段手持商品的视频（最好是 iPhone Live Photo 的 `.MOV`，才能导出 Live Photo），一张新场景图。
-- 场景图用任何生图工具都行。提示词模板见 `demo/eucerin/background-prompt.txt`：只要背景、不要人和商品、不要文字、竖版 3:4、中间留空、
-  明暗和原片接近（白瓶子别配纯白背景）。
+- 场景图：用户没给的话，你来写提示词并生成。我们用 Codex CLI（`codex exec -m gpt-5.6-terra --sandbox read-only --skip-git-repo-check
+  "Generate one image. Do not write code, do not explain. <提示词>"`，图在 `~/.codex/generated_images/`，约 1 分钟一张）。
+  提示词例子见 `demo/eucerin/background-prompt.txt` 和 `demo/gallery/scene-prompts/`：只要背景、不要人手商品文字、竖版 3:4、
+  中间留空、道具放边角、明暗接近原片的墙（白瓶子别配纯白背景）、按商品用途配场景。生成后先看一眼：商品或手被画进去了就重生成。
 
 ## 1. 选片（不合格的片子后面怎么修都修不好）
 
@@ -38,6 +40,7 @@ live-swap-bg init input.MOV work/<名字> [--start 秒 --end 秒]
 
 ## 3. 种子掩膜（最关键的一步）
 
+这一步由你来做，不要让用户手动打点；用户只在最后看成片。
 打开 `work/<名字>/seed-grid.jpg`（种子帧加 60px 坐标网格），**在全尺寸图上量坐标，不要在缩略图上估**。写 `prompts.json`：
 
 ```json
