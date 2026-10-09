@@ -1,5 +1,7 @@
 # live-swap-bg · 动图换背景
 
+[English](README.en.md) | 中文
+
 把一段**真实拍摄**的手持商品视频（iPhone Live Photo / 短视频）换到一个新场景里：
 手和商品原样保留，背景换成你生成的场景图，并且跟着原镜头一起移动。导出 MP4，也能导出 Live Photo。
 
@@ -126,24 +128,3 @@ pytest -q
 [ViTMatte](https://huggingface.co/hustvl/vitmatte-base-distinctions-646)，由 `download-models` 从发布方下载，不随仓库分发。
 快速开始用的 Eucerin 素材是作者自己拍的；顶部对比里的三条原片是商家提供的推广素材，只用来展示效果，不随仓库分发。画面里的品牌归其所有者。
 
----
-
-## English
-
-**live-swap-bg** swaps the background of a real, hand-held product clip (an iPhone Live Photo or a short video):
-the hand and the product stay exactly as shot, and the new scene moves with the original camera.
-
-- **No video generation model.** The hand and product are real footage; the tool only segments and mattes
-  (SAM 2 + ViTMatte), so the product never warps and its label text never gets rewritten. Only the background is
-  generated, as one still image: ours come from the Codex CLI image tool (`codex exec -m gpt-5.6-terra`, about a minute
-  each); any image model should do if the prompt rules out people, hands, products and text and asks for portrait 3:4.
-- **Runs on your own GPU.** A 2.8 s Live Photo (83 frames) takes 5-7 minutes end to end on an Apple M4 Mac.
-- **Looks shot on location.** The new background follows the camera motion measured from the original background,
-  the product is relit to the plate's light and casts a shadow, and the old wall colour is cleaned off the matte edge.
-
-Output is 720×960 portrait at 30 fps; only camera translation is reconstructed. Tested on Apple Silicon (MPS);
-CUDA is supported in code but untested. Live Photo export is macOS only and needs the original Live Photo `.MOV`.
-The prompt points that seed the matte are written by an AI agent looking at a gridded first frame (or by hand);
-a person still has to review every result. Install with `pip install -e .` then `live-swap-bg download-models`;
-the walkthrough above uses the bundled demo clip (the three clips in the comparison at the top are not shipped). A Claude Code skill in `skills/live-swap-bg/` guides an agent
-through every step and its known failure modes.
