@@ -5,6 +5,9 @@
   the edge (a stray pixel, a translucent rim) shows the original wall, and it disappears when the plate right
   there is close in colour. First the whole plate gets an exposure/white-balance nudge (no patch shows), then
   the ring closes the rest. Outside the ring the scene stays as generated.
+- Matching only works when the scene is roughly as bright as the original wall. A bright seaside room behind a
+  clip shot against a dark grey wall would be dragged down to grey, so a large gap is refused; pick a scene
+  closer in brightness, or pass match=False to keep the scene as is (render's edge repair still cleans the rim).
 """
 
 import json
@@ -18,6 +21,7 @@ from .clip import HEIGHT, WIDTH, Clip
 from .motion import plate_to_frame
 
 FULL_MATCH_PX, FADE_PX = 20, 120  # matched within 20 px of the edge, fading out over 120 px (shorter shows a patch)
+MAX_LIGHTNESS_GAP = 20  # CIELAB L between the scene near the edge and the original wall
 
 
 def wall_colour(clip: Clip) -> np.ndarray:
@@ -31,7 +35,7 @@ def wall_colour(clip: Clip) -> np.ndarray:
     return np.median(np.concatenate(samples), axis=0).astype(np.float32)
 
 
-def prepare_plate(clip: Clip, background: Path, *, blur: int = 3, frame_space: bool = False) -> dict:
+def prepare_plate(clip: Clip, background: Path, *, blur: int = 3, frame_space: bool = False, match: bool = True) -> dict:
     """frame_space=True: the scene was composed as the viewer sees the frame, so map it back through the middle
     frame's zoom and shift. Use it when the camera moved a lot and props near the edge would be pushed out."""
     motion = json.loads(clip.require(clip.root / "motion.json", "run `live-swap-bg motion` first").read_text())
@@ -63,13 +67,21 @@ def prepare_plate(clip: Clip, background: Path, *, blur: int = 3, frame_space: b
         raise ValueError("the foreground never comes near the plate; check alpha/")
     lab = cv2.cvtColor(blurred, cv2.COLOR_RGB2LAB)
     band_mean = (lab * weight[:, :, None]).sum(axis=(0, 1)) / weight.sum()
-    lab = lab + (target - band_mean) * np.array([1.0, 0.5, 0.5], np.float32)  # half the tint: keep the scene's mood
-    local = np.dstack([cv2.GaussianBlur(lab[:, :, c], (0, 0), 30) for c in range(3)])
-    matched = lab + weight[:, :, None] * np.array([1.0, 0.3, 0.3], np.float32) * (target - local)
-    out = np.clip(cv2.cvtColor(matched, cv2.COLOR_LAB2RGB), 0, 1)
+    gap = float(target[0] - band_mean[0])
+    if match and abs(gap) > MAX_LIGHTNESS_GAP:
+        raise ValueError(f"the scene around the foreground (L={band_mean[0]:.0f}) is {abs(gap):.0f} "
+                         f"{'darker' if gap > 0 else 'brighter'} than the original wall (L={target[0]:.0f}); matching "
+                         f"would recolour the whole scene. Generate a scene closer in brightness, or rerun with "
+                         f"--no-match to only blur it (render's edge repair still cleans the rim)")
+    if match:
+        lab = lab + (target - band_mean) * np.array([1.0, 0.5, 0.5], np.float32)  # half the tint: keep the scene's mood
+        local = np.dstack([cv2.GaussianBlur(lab[:, :, c], (0, 0), 30) for c in range(3)])
+        lab = lab + weight[:, :, None] * np.array([1.0, 0.3, 0.3], np.float32) * (target - local)
+    out = np.clip(cv2.cvtColor(lab, cv2.COLOR_LAB2RGB), 0, 1)
     Image.fromarray(np.uint8(out * 255 + 0.5)).save(clip.root / "plate.png")
     Image.fromarray(np.uint8(weight * 255)).save(clip.root / "plate-match-weight.png")
     result = {"background": str(Path(background).resolve()), "blur_radius": blur, "frame_space": frame_space,
-              "wall_lab": np.round(target, 2).tolist(), "ring_lab_before": np.round(band_mean, 2).tolist()}
+              "matched": match, "wall_lab": np.round(target, 2).tolist(),
+              "ring_lab_before": np.round(band_mean, 2).tolist(), "lightness_gap": round(gap, 1)}
     clip.write_json("plate.json", result)
     return result

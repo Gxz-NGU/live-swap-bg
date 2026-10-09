@@ -3,7 +3,9 @@
 把一段**真实拍摄**的手持商品视频（iPhone Live Photo / 短视频）换到一个新场景里：
 手和商品原样保留，背景换成你生成的场景图，并且跟着原镜头一起移动。导出 MP4，也能导出 Live Photo。
 
-![前后对比：左边原片，右边换背景后](demo/eucerin/before-after.gif)
+![前后对比：左边原片，右边换背景后](demo/gallery/before-after.gif)
+
+三条都是同一套默认流程跑出来的：手、指甲、包装字都是原片里的像素，背景跟着原镜头平移。静态总览见 [`demo/gallery/before-after.jpg`](demo/gallery/before-after.jpg)。
 
 ## 为什么做这个
 
@@ -80,7 +82,7 @@ cp -r skills/live-swap-bg ~/.claude/skills/
 | 抠图 | `matte` | ViTMatte 抠出软边缘；`--thin` 保住泵嘴、刷头这类细部件 |
 | 稳定 | `stabilize` | 可选：掩膜投票、补 alpha 掉帧、alpha 中值，各有副作用，见 skill |
 | 运动 | `motion` | 从原背景估算镜头平移；估不准时自动改成静止背景 |
-| 背景板 | `plate` | 人像虚化，前景边缘一圈对齐原墙颜色 |
+| 背景板 | `plate` | 人像虚化，前景边缘一圈对齐原墙颜色；新场景和原墙亮度差太大时报错，改用 `--no-match` 只虚化 |
 | 渲染 | `render` | 边缘修复、重新打光、投影，合成并编码 |
 | 自查 | `crops` `jitter` `flicker` | 边缘放大图、背景抖动、单帧闪烁扫描 |
 | 导出 | `livephoto` | Live Photo 图片 + 视频，去掉机型、时间、位置等元数据 |
@@ -97,7 +99,7 @@ pytest -q
 
 代码采用 [MIT](LICENSE)。用到的模型都是 Apache-2.0：[SAM 2](https://github.com/facebookresearch/sam2)、
 [ViTMatte](https://huggingface.co/hustvl/vitmatte-base-distinctions-646)，由 `download-models` 从发布方下载，不随仓库分发。
-演示视频是作者自己拍的，画面里的品牌归其所有者。
+快速开始用的 Eucerin 素材是作者自己拍的；顶部对比里的三条原片是商家提供的推广素材，只用来展示效果，不随仓库分发。画面里的品牌归其所有者。
 
 ---
 
@@ -116,5 +118,5 @@ the hand and the product stay exactly as shot, and the new scene moves with the 
 Output is 720×960 portrait at 30 fps; only camera translation is reconstructed. Tested on Apple Silicon (MPS);
 CUDA is supported in code but untested. Live Photo export is macOS only and needs the original Live Photo `.MOV`.
 A person still has to review every result. Install with `pip install -e .` then `live-swap-bg download-models`;
-the walkthrough above uses the bundled demo clip. A Claude Code skill in `skills/live-swap-bg/` guides an agent
+the walkthrough above uses the bundled demo clip (the three clips in the comparison at the top are not shipped). A Claude Code skill in `skills/live-swap-bg/` guides an agent
 through every step and its known failure modes.

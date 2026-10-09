@@ -88,9 +88,11 @@ live-swap-bg motion work/<名字>             # 原背景几乎无纹理会报�
 ## 7. 背景板
 
 ```bash
-live-swap-bg plate work/<名字> scene.png [--blur 3] [--frame-space]
+live-swap-bg plate work/<名字> scene.png [--blur 3] [--frame-space] [--no-match]
 ```
 做人像虚化，并只把前景边缘一圈调成原墙的颜色（残边、半透明处透出的都是原墙色，这一圈接近了就看不出来），圈外保持原场景。
+新场景和原墙亮度差超过 20（CIELAB L）会直接报错：对齐会把整张场景拉暗或拉亮（深灰墙前拍的片子配明亮海景，海景会被压成灰的）。
+两个办法：换一张亮度接近原墙的场景；或者加 `--no-match` 只虚化不调色，残边交给 render 的边缘修复，渲完要重点看 `edge-crops.jpg` 有没有原墙色的白边/黑边。
 镜头移动很大、场景道具被挤出画面时加 `--frame-space`。
 
 ## 8. 渲染 + 自查

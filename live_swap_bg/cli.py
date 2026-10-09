@@ -68,6 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("background", type=Path)
     p.add_argument("--blur", type=int, default=3, help="portrait-mode disc blur radius in pixels")
     p.add_argument("--frame-space", action="store_true", help="the scene was composed as the viewer sees the frame")
+    p.add_argument("--no-match", action="store_true", help="only blur; do not pull the edge colours toward the old wall")
     p = stage("render", "composite and encode the MP4")
     p.add_argument("--background", type=Path, help="use this image instead of plate.png")
     p.add_argument("--no-edge-repair", action="store_true")
@@ -126,7 +127,7 @@ def run(args: argparse.Namespace) -> object:
         return {k: v for k, v in result.items() if k not in ("positions", "quality")}
     if command == "plate":
         from .plate import prepare_plate
-        return prepare_plate(clip, args.background, blur=args.blur, frame_space=args.frame_space)
+        return prepare_plate(clip, args.background, blur=args.blur, frame_space=args.frame_space, match=not args.no_match)
     if command == "render":
         from .render import render
         return render(clip, background=args.background, edge_repair=not args.no_edge_repair,

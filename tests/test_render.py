@@ -59,3 +59,15 @@ def test_checks_run_on_a_rendered_clip(synthetic_clip, tmp_path):
     assert len(jitter["high_frequency_std_px"]) == 2
     crops = edge_crops(clip)
     assert (clip.out_dir / "edge-crops.jpg").exists() and crops["frames"][0] == 0
+
+
+def test_plate_refuses_a_scene_far_brighter_than_the_old_wall(synthetic_clip, tmp_path):
+    clip, _ = synthetic_clip
+    estimate_motion(clip)
+    Image.new("RGB", (720, 960), (250, 250, 250)).save(tmp_path / "white.png")
+    with pytest.raises(ValueError, match="--no-match"):
+        prepare_plate(clip, tmp_path / "white.png")
+    result = prepare_plate(clip, tmp_path / "white.png", match=False)
+    assert result["matched"] is False
+    plate = np.asarray(Image.open(clip.root / "plate.png"))
+    assert plate.mean() > 245  # left as bright as generated
